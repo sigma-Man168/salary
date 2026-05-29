@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🌸 薪资小本本</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+    background:#fff5f5;color:#5d4037;max-width:480px;margin:0 auto;min-height:100vh;
+    padding-bottom:40px;-webkit-tap-highlight-color:transparent;
+  }
+  .page{display:none;flex-direction:column;align-items:center;justify-content:center;
+    min-height:100vh;padding:20px;text-align:center;}
+  .page.active{display:flex;}
+  .card{background:#fff;border-radius:24px;padding:40px 28px;width:100%;max-width:360px;
+    box-shadow:0 8px 40px rgba(240,140,156,0.15);border:1px solid #fce4ec;}
+  .icon{font-size:56px;margin-bottom:16px;}
+  .card h2{font-size:22px;margin-bottom:6px;color:#5d4037;}
+  .card .sub{font-size:14px;color:#bcaaa4;margin-bottom:24px;}
+  .card input{width:100%;padding:14px 16px;border:2px solid #f3e0e0;border-radius:12px;
+    font-size:16px;text-align:center;margin-bottom:16px;background:#fefafa;color:#5d4037;}
+  .card input:focus{outline:none;border-color:#f08c9c;}
+  .btn{width:100%;padding:14px;border-radius:12px;border:none;font-size:16px;font-weight:700;
+    cursor:pointer;background:linear-gradient(135deg,#f8a4b8,#f08c9c);color:#fff;
+    box-shadow:0 4px 16px rgba(240,140,156,0.3);}
+  .btn:active{opacity:0.85;}
+  .err{font-size:13px;color:#e57373;margin-top:10px;min-height:20px;}
+  .spinner{display:inline-block;width:28px;height:28px;border:3px solid #fce4ec;
+    border-top-color:#f08c9c;border-radius:50%;animation:spin .8s linear infinite;margin:8px;}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:#5d4037;
+    color:#fff;padding:10px 24px;border-radius:20px;font-size:13px;z-index:200;opacity:0;
+    transition:opacity .3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+
+  /* 主界面 */
+  .header{background:linear-gradient(135deg,#f8a4b8,#f08c9c);color:#fff;padding:18px 20px;
+    position:sticky;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;
+    box-shadow:0 4px 20px rgba(240,140,156,0.25);border-radius:0 0 20px 20px;}
+  .header h1{font-size:18px;font-weight:600;}
+  .header button{background:rgba(255,255,255,0.25);border:none;color:#fff;width:38px;height:38px;
+    border-radius:50%;font-size:18px;cursor:pointer;}
+  .month-bar{display:flex;align-items:center;justify-content:center;gap:20px;padding:16px;}
+  .month-bar button{background:#fff;border:2px solid #f3e0e0;width:38px;height:38px;
+    border-radius:50%;font-size:16px;cursor:pointer;color:#e67389;}
+  .month-bar span{font-size:18px;font-weight:700;}
+  .rest-bar{background:#fff;margin:4px 12px 8px;padding:14px 16px;border-radius:16px;
+    box-shadow:0 2px 12px rgba(240,140,156,0.1);display:flex;align-items:center;
+    justify-content:space-between;flex-wrap:wrap;gap:8px;border:1px solid #f3e0e0;}
+  .rest-bar .info{font-size:13px;color:#bcaaa4;font-weight:500;}
+  .rest-bar .info strong{color:#f9a825;}
+  .badge{font-size:12px;padding:5px 12px;border-radius:20px;font-weight:600;}
+  .badge-ok{background:#e8f5e9;color:#43a047;}
+  .badge-warn{background:#fff8e1;color:#f9a825;}
+  .hint{text-align:center;font-size:12px;color:#d7ccc8;margin:6px 12px;font-style:italic;}
+  .action-bar{display:flex;gap:8px;margin:8px 12px;justify-content:center;}
+  .action-bar button{font-size:12px;padding:8px 16px;border-radius:20px;border:1.5px solid #f3e0e0;
+    background:#fff;color:#a1887f;cursor:pointer;font-weight:500;}
+  .day-list{margin:0 12px;display:flex;flex-direction:column;gap:8px;}
+  .day-row{background:#fff;padding:14px;border-radius:10px;
+    box-shadow:0 2px 12px rgba(240,140,156,0.1);display:flex;align-items:center;gap:10px;
+    border:1px solid #f3e0e0;border-left:5px solid transparent;}
+  .day-row.rest{border-left-color:#ffb74d;background:#fffdf7;}
+  .day-row.work{border-left-color:#fce4ec;}
+  .day-row .toggle-btn{width:30px;height:30px;border-radius:50%;border:2px solid #e0d0d0;
+    background:#fff;cursor:pointer;flex-shrink:0;font-size:14px;}
+  .day-row.rest .toggle-btn{border-color:#ffb74d;background:#fff3e0;}
+  .day-row.rest .toggle-btn::after{content:'✓';font-size:15px;color:#e65100;font-weight:700;}
+  .day-row .day-num{font-size:26px;font-weight:700;min-width:38px;text-align:center;}
+  .day-row.rest .day-num{color:#e65100;}
+  .day-row .day-info{flex:1;min-width:0;}
+  .day-row .day-weekday{font-size:12px;color:#bcaaa4;}
+  .day-row .day-type-tag{font-size:11px;padding:3px 10px;border-radius:10px;
+    display:inline-block;font-weight:600;margin-top:3px;}
+  .tag-work{background:#fce4ec;color:#e67389;}
+  .tag-rest{background:#fff3e0;color:#e65100;}
+  .day-row .hours-input{width:60px;height:40px;border:2px solid #f3e0e0;border-radius:10px;
+    text-align:center;font-size:16px;font-weight:600;background:#fefafa;}
+  .day-row .hours-input:focus{outline:none;border-color:#f08c9c;}
+  .day-row .salary-cell{font-size:14px;font-weight:700;color:#81c784;min-width:68px;
+    text-align:right;white-space:nowrap;}
+  .day-row .salary-cell .detail{font-size:10px;color:#bcaaa4;font-weight:400;}
+  .summary-card{margin:16px 12px;background:#fff;border-radius:16px;
+    box-shadow:0 2px 12px rgba(240,140,156,0.1);padding:18px;border:1px solid #f3e0e0;}
+  .summary-card h3{font-size:15px;margin-bottom:14px;}
+  .summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .summary-item{background:#fefafa;padding:14px 10px;border-radius:12px;text-align:center;}
+  .summary-item .label{font-size:11px;color:#bcaaa4;margin-bottom:4px;}
+  .summary-item .value{font-size:16px;font-weight:700;}
+  .summary-full{grid-column:1/-1;background:linear-gradient(135deg,#f8a4b8,#f08c9c);}
+  .summary-full .label{color:rgba(255,255,255,0.85);}
+  .summary-full .value{color:#fff;font-size:28px;font-weight:800;}
+  .modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+    background:rgba(93,64,55,0.35);backdrop-filter:blur(4px);z-index:100;
+    justify-content:center;align-items:center;}
+  .modal-overlay.active{display:flex;}
+  .modal{background:#fff;border-radius:20px;padding:28px 24px;width:90%;max-width:360px;}
+  .modal h2{font-size:18px;margin-bottom:18px;}
+  .modal label{display:block;font-size:13px;color:#bcaaa4;margin-bottom:4px;font-weight:500;}
+  .modal input{width:100%;padding:12px 14px;border:2px solid #f3e0e0;border-radius:10px;
+    font-size:16px;margin-bottom:14px;background:#fefafa;}
+  .modal .btn-row{display:flex;gap:10px;}
+  .modal .btn-flex{flex:1;padding:12px;border-radius:10px;border:none;font-size:15px;
+    font-weight:600;cursor:pointer;}
+  .btn-primary{background:#f08c9c;color:#fff;}
+  .btn-ghost{background:#fef5f5;color:#bcaaa4;}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- 加载页 -->
+<div class="page active" id="loadingPage">
+  <div class="card">
+    <div class="icon">🌸</div>
+    <h2>薪资小本本</h2>
+    <div class="sub" id="loadingText">正在加载...</div>
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<!-- 登录页 -->
+<div class="page" id="loginPage">
+  <div class="card">
+    <div class="icon">🌸</div>
+    <h2 id="loginTitle">薪资小本本</h2>
+    <div class="sub" id="loginSub">记录每一天的努力 💕</div>
+    <input type="password" id="passwordInput" placeholder="请输入密码" maxlength="20" autocomplete="off">
+    <button class="btn" id="loginBtn">确 认</button>
+    <div class="err" id="loginError"></div>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div class="page" id="mainPage" style="min-height:auto;padding:0;text-align:left;display:none;">
+  <div class="header">
+    <button onclick="changeMonth(-1)">◀</button>
+    <h1>🌸 薪资小本本</h1>
+    <button onclick="changeMonth(1)">▶</button>
+  </div>
+  <div class="month-bar">
+    <button onclick="changeMonth(-1)">◀</button>
+    <span id="monthLabel">2025年 5月</span>
+    <button onclick="changeMonth(1)">▶</button>
+  </div>
+  <div class="rest-bar">
+    <span class="info">本月 <strong id="sundayCount">0</strong> 个周日 · 调休天数 <strong id="restNeed">0</strong></span>
+    <span id="restBadge"></span>
+  </div>
+  <div class="action-bar">
+    <button onclick="showSettings()">⚙️ 设置</button>
+    <button onclick="exportData()">📥 导出备份</button>
+    <button onclick="importData()">📤 导入备份</button>
+  </div>
+  <div class="hint">💡 点击圆圈切换工作日/调休日，在输入框填写当天工时</div>
+  <div class="day-list" id="dayList"><div style="text-align:center;padding:40px;color:#bcaaa4;">加载中...</div></div>
+  <div class="summary-card">
+    <h3>📊 本月汇总</h3>
+    <div class="summary-grid" id="summaryGrid"></div>
+  </div>
+</div>
+
+<!-- 设置弹窗 -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>⚙️ 设置</h2>
+    <label>💰 基本时薪（元/小时）</label>
+    <input type="number" id="hourlyRateInput" step="0.01" min="0">
+    <label>🔒 修改密码（留空不修改）</label>
+    <input type="password" id="newPasswordInput" placeholder="新密码" maxlength="20" autocomplete="off">
+    <div class="btn-row">
+      <button class="btn-flex btn-ghost" onclick="closeSettings()">取消</button>
+      <button class="btn-flex btn-primary" onclick="saveSettings()">保存</button>
+    </div>
+    <div class="err" id="settingsMsg"></div>
+  </div>
+</div>
+
+<script>
+// ============ 全部使用 var 避免作用域问题 ============
+var SUPABASE_URL = 'https://xdnhifgxupmzemnqzkrr.supabase.co';
+var SUPABASE_KEY = 'sb_publishable_B_QdU9sycsHUQRnTdu3_7Q_v0Gen-21';
+var DEFAULT_RATE = 21.36;
+var NORMAL_HOURS = 9;
+
+var _supabase = null;
+var _currentYear, _currentMonth;
+var _allLogs = [];
+var _restDays = [];
+var _hourlyRate = DEFAULT_RATE;
+var _isLoggedIn = false;
+
+// ============ 初始化 Supabase ============
+function initSupabase() {
+  _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { db: { schema: 'public' } });
+}
+
+// ============ 工具函数 ============
+function fmtDate(y, m, d) {
+  var mm = m < 10 ? '0' + m : '' + m;
+  var dd = d < 10 ? '0' + d : '' + d;
+  return y + '-' + mm + '-' + dd;
+}
+function fmtMonth(y, m) {
+  var mm = m < 10 ? '0' + m : '' + m;
+  return y + '-' + mm;
+}
+function daysInMonth(y, m) {
+  return new Date(y, m, 0).getDate();
+}
+function getWeekday(y, m, d) {
+  return ['日','一','二','三','四','五','六'][new Date(y, m-1, d).getDay()];
+}
+function isSunday(y, m, d) {
+  return new Date(y, m-1, d).getDay() === 0;
+}
+function countSundays(y, m) {
+  var total = daysInMonth(y, m), count = 0;
+  for (var d = 1; d <= total; d++) { if (isSunday(y, m, d)) count++; }
+  return count;
+}
+function formatMoney(n) { return '¥' + n.toFixed(2); }
+
+// ============ Toast ============
+var _toastTimer;
+function showToast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2000);
+}
+
+// ============ 密码 ============
+async function hashPassword(pwd) {
+  var encoder = new TextEncoder();
+  var data = encoder.encode(pwd + 'salary_salt_2025');
+  var hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+}
+
+// ============ Session ============
+function safeGetSession(key) {
+  try { return sessionStorage.getItem(key); } catch(e) { return null; }
+}
+function safeSetSession(key, val) {
+  try { sessionStorage.setItem(key, val); return true; } catch(e) { return false; }
+}
+
+// ============ 认证 ============
+async function checkAuth() {
+  if (safeGetSession('salary_logged_in') === 'true') {
+    _isLoggedIn = true;
+    return;
+  }
+
+  var result = await _supabase.from('config').select('value').eq('key', 'app_password').maybeSingle();
+  var data = result.data;
+  var error = result.error;
+
+  if (error && error.code !== 'PGRST116') {
+    console.error('Check auth error:', error);
+  }
+
+  var hasPassword = data && data.value;
+
+  if (hasPassword) {
+    document.getElementById('loginTitle').textContent = '🌸 欢迎回来';
+    document.getElementById('loginSub').textContent = '请输入密码查看薪资小本本';
+  } else {
+    document.getElementById('loginTitle').textContent = '🌸 薪资小本本';
+    document.getElementById('loginSub').textContent = '首次使用，请设置一个密码吧';
+  }
+}
+
+async function doLogin() {
+  var pwd = document.getElementById('passwordInput').value.trim();
+  var errEl = document.getElementById('loginError');
+  if (!pwd) { errEl.textContent = '请输入密码~'; return; }
+
+  var hashed = await hashPassword(pwd);
+  var existing = await _supabase.from('config').select('value').eq('key', 'app_password').maybeSingle();
+
+  if (!existing.data || !existing.data.value) {
+    var upsertResult = await _supabase.from('config').upsert({ key: 'app_password', value: hashed }, { onConflict: 'key' });
+    if (upsertResult.error) { errEl.textContent = '设置失败：' + upsertResult.error.message; return; }
+    showToast('🎉 密码设置成功！');
+  } else {
+    if (existing.data.value !== hashed) { errEl.textContent = '密码不对哦，再试一次~'; return; }
+  }
+
+  safeSetSession('salary_logged_in', 'true');
+  _isLoggedIn = true;
+  switchPage('mainPage');
+  document.getElementById('passwordInput').value = '';
+  document.getElementById('loginError').textContent = '';
+
+  await loadSettings();
+  goToToday();
+}
+
+// ============ 页面切换 ============
+function switchPage(id) {
+  var pages = document.querySelectorAll('.page');
+  for (var i = 0; i < pages.length; i++) {
+    pages[i].classList.remove('active');
+    if (pages[i].id !== 'mainPage') pages[i].style.display = 'none';
+  }
+  var target = document.getElementById(id);
+  target.classList.add('active');
+  if (id === 'mainPage') target.style.display = 'block';
+  else target.style.display = 'flex';
+}
+
+// ============ 设置 ============
+async function loadSettings() {
+  var result = await _supabase.from('config').select('value').eq('key', 'hourly_rate').maybeSingle();
+  if (result.data && result.data.value) {
+    _hourlyRate = parseFloat(result.data.value) || DEFAULT_RATE;
+  }
+}
+async function saveHourlyRate(rate) {
+  await _supabase.from('config').upsert({ key: 'hourly_rate', value: String(rate) }, { onConflict: 'key' });
+  _hourlyRate = rate;
+}
+async function changePassword(newPwd) {
+  var hashed = await hashPassword(newPwd);
+  await _supabase.from('config').upsert({ key: 'app_password', value: hashed }, { onConflict: 'key' });
+}
+function showSettings() {
+  document.getElementById('hourlyRateInput').value = _hourlyRate;
+  document.getElementById('newPasswordInput').value = '';
+  document.getElementById('settingsMsg').textContent = '';
+  document.getElementById('settingsModal').classList.add('active');
+}
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('active');
+}
+async function saveSettings() {
+  var msgEl = document.getElementById('settingsMsg');
+  var rateStr = document.getElementById('hourlyRateInput').value.trim();
+  var newPwd = document.getElementById('newPasswordInput').value.trim();
+
+  if (rateStr) {
+    var rate = parseFloat(rateStr);
+    if (isNaN(rate) || rate <= 0) { msgEl.textContent = '时薪格式不对哦'; return; }
+    await saveHourlyRate(rate);
+  }
+  if (newPwd) {
+    if (newPwd.length < 2) { msgEl.textContent = '密码至少2位哦'; return; }
+    await changePassword(newPwd);
+  }
+  msgEl.style.color = '#81c784';
+  msgEl.textContent = '✅ 保存成功~';
+  setTimeout(closeSettings, 600);
+  await loadMonthData(_currentYear, _currentMonth);
+}
+
+// ============ 月份导航 ============
+function goToToday() {
+  var now = new Date();
+  _currentYear = now.getFullYear();
+  _currentMonth = now.getMonth() + 1;
+  loadMonthData(_currentYear, _currentMonth);
+}
+function changeMonth(delta) {
+  _currentMonth += delta;
+  if (_currentMonth > 12) { _currentMonth = 1; _currentYear++; }
+  if (_currentMonth < 1) { _currentMonth = 12; _currentYear--; }
+  loadMonthData(_currentYear, _currentMonth);
+}
+
+// ============ 加载月数据 ============
+async function loadMonthData(y, m) {
+  _currentYear = y;
+  _currentMonth = m;
+  var monthStr = fmtMonth(y, m);
+  var totalDays = daysInMonth(y, m);
+  var sundays = countSundays(y, m);
+
+  document.getElementById('monthLabel').textContent = y + '年 ' + m + '月';
+  document.getElementById('sundayCount').textContent = sundays;
+  document.getElementById('restNeed').textContent = sundays;
+
+  var result = await _supabase.from('work_logs').select('*').eq('month', monthStr).order('date', { ascending: true });
+
+  if (result.error) {
+    console.error('Load error:', result.error);
+    showToast('⚠️ 加载失败：' + result.error.message);
+    return;
+  }
+
+  var logs = result.data || [];
+  var logMap = {};
+  logs.forEach(function(l) { logMap[l.date] = l; });
+
+  _allLogs = [];
+  _restDays = [];
+  var upserts = [];
+
+  for (var d = 1; d <= totalDays; d++) {
+    var dateStr = fmtDate(y, m, d);
+    if (logMap[dateStr]) {
+      _allLogs.push(logMap[dateStr]);
+      if (logMap[dateStr].is_rest_day) _restDays.push(dateStr);
+    } else {
+      var rec = { date: dateStr, month: monthStr, hours: 0, is_rest_day: false };
+      _allLogs.push(rec);
+      upserts.push(rec);
+    }
+  }
+
+  if (upserts.length > 0) {
+    await _supabase.from('work_logs').upsert(upserts, { onConflict: 'date' });
+    var refreshed = await _supabase.from('work_logs').select('*').eq('month', monthStr).order('date', { ascending: true });
+    if (refreshed.data) {
+      var refreshedMap = {};
+      refreshed.data.forEach(function(l) { refreshedMap[l.date] = l; });
+      _allLogs = [];
+      _restDays = [];
+      for (var d2 = 1; d2 <= totalDays; d2++) {
+        var dateStr2 = fmtDate(y, m, d2);
+        var rec2 = refreshedMap[dateStr2] || { date: dateStr2, month: monthStr, hours: 0, is_rest_day: false };
+        _allLogs.push(rec2);
+        if (rec2.is_rest_day) _restDays.push(dateStr2);
+      }
+    }
+  }
+
+  renderDayList();
+  renderSummary();
+  updateRestBadge(sundays);
+}
+
+// ============ 渲染 ============
+function renderDayList() {
+  var container = document.getElementById('dayList');
+  if (_allLogs.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:#bcaaa4;">✨ 暂无数据</div>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < _allLogs.length; i++) {
+    var log = _allLogs[i];
+    var parts = log.date.split('-');
+    var y = parseInt(parts[0]), m2 = parseInt(parts[1]), day = parseInt(parts[2]);
+    var weekday = getWeekday(y, m2, day);
+    var isWeekend = (weekday === '日' || weekday === '六');
+    var isRest = log.is_rest_day;
+    var hours = parseFloat(log.hours) || 0;
+    var rowClass = isRest ? 'rest' : 'work';
+    var tagClass = isRest ? 'tag-rest' : 'tag-work';
+    var tagLabel = isRest ? '🌙 调休日' : '☀️ 工作日';
+    var salaryInfo = calcDaySalary(hours, isRest);
+    var weekendMark = isWeekend ? '🔸' : '';
+    var hasOt = (hours > NORMAL_HOURS && !isRest) ? ' has-ot' : '';
+    var hoursVal = hours > 0 ? hours : '';
+
+    html += '<div class="day-row ' + rowClass + hasOt + '" data-date="' + log.date + '">';
+    html += '<button class="toggle-btn" onclick="toggleRestDay(\'' + log.date + '\')"></button>';
+    html += '<div class="day-num">' + day + '</div>';
+    html += '<div class="day-info"><div class="day-weekday">星期' + weekday + ' ' + weekendMark + '</div>';
+    html += '<span class="day-type-tag ' + tagClass + '">' + tagLabel + '</span></div>';
+    html += '<input class="hours-input" type="number" value="' + hoursVal + '" placeholder="0" step="0.5" min="0" max="24" inputmode="decimal" onchange="updateHours(\'' + log.date + '\', this.value)">';
+    html += '<div class="salary-cell">' + salaryInfo.total + '<div class="detail">' + salaryInfo.detail + '</div></div>';
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+function calcDaySalary(hours, isRest) {
+  if (hours <= 0) return { total: '¥0', detail: '休息中~' };
+  if (isRest) {
+    var amount = hours * _hourlyRate * 2;
+    return { total: formatMoney(amount), detail: '2倍·' + hours + 'h' };
+  }
+  var normalH = Math.min(hours, NORMAL_HOURS);
+  var otH = Math.max(0, hours - NORMAL_HOURS);
+  var total = normalH * _hourlyRate + otH * _hourlyRate * 1.5;
+  if (otH > 0) return { total: formatMoney(total), detail: '正常' + normalH + 'h+加班' + otH + 'h' };
+  return { total: formatMoney(total), detail: '正常·' + hours + 'h' };
+}
+
+function renderSummary() {
+  var grid = document.getElementById('summaryGrid');
+  var totalHours = 0, workNormalPay = 0, workOtPay = 0, restPay = 0;
+
+  for (var i = 0; i < _allLogs.length; i++) {
+    var log = _allLogs[i];
+    var h = parseFloat(log.hours) || 0;
+    if (h <= 0) continue;
+    totalHours += h;
+
+    if (log.is_rest_day) {
+      restPay += h * _hourlyRate * 2;
+    } else {
+      var normalH = Math.min(h, NORMAL_HOURS);
+      var otH = Math.max(0, h - NORMAL_HOURS);
+      workNormalPay += normalH * _hourlyRate;
+      workOtPay += otH * _hourlyRate * 1.5;
+    }
+  }
+
+  var totalPay = workNormalPay + workOtPay + restPay;
+
+  grid.innerHTML =
+    '<div class="summary-item"><div class="label">⏱ 总工时</div><div class="value">' + totalHours.toFixed(1) + ' h</div></div>' +
+    '<div class="summary-item"><div class="label">💼 工作日正常</div><div class="value">' + formatMoney(workNormalPay) + '</div></div>' +
+    '<div class="summary-item"><div class="label">🔥 工作日加班</div><div class="value">' + formatMoney(workOtPay) + '</div></div>' +
+    '<div class="summary-item"><div class="label">🌟 调休加班</div><div class="value">' + formatMoney(restPay) + '</div></div>' +
+    '<div class="summary-item summary-full"><div class="label">📌 本月总薪资</div><div class="value">' + formatMoney(totalPay) + '</div></div>';
+}
+
+function updateRestBadge(sundays) {
+  var selected = _restDays.length;
+  var badge = document.getElementById('restBadge');
+  if (selected === sundays) {
+    badge.innerHTML = '<span class="badge badge-ok">✅ 已选 ' + selected + '/' + sundays + '</span>';
+  } else if (selected < sundays) {
+    badge.innerHTML = '<span class="badge badge-warn">⚠️ 还需选 ' + (sundays - selected) + ' 天</span>';
+  } else {
+    badge.innerHTML = '<span class="badge badge-warn">⚠️ 多选 ' + (selected - sundays) + ' 天</span>';
+  }
+}
+
+// ============ 交互 ============
+async function toggleRestDay(dateStr) {
+  var sundays = countSundays(_currentYear, _currentMonth);
+  var idx = _restDays.indexOf(dateStr);
+  var isCurrentlyRest = idx >= 0;
+
+  if (isCurrentlyRest) {
+    _restDays.splice(idx, 1);
+  } else {
+    _restDays.push(dateStr);
+  }
+
+  await _supabase.from('work_logs').update({ is_rest_day: !isCurrentlyRest, updated_at: new Date().toISOString() }).eq('date', dateStr);
+
+  for (var i = 0; i < _allLogs.length; i++) {
+    if (_allLogs[i].date === dateStr) { _allLogs[i].is_rest_day = !isCurrentlyRest; break; }
+  }
+
+  renderDayList();
+  renderSummary();
+  updateRestBadge(sundays);
+}
+
+async function updateHours(dateStr, value) {
+  var hours = parseFloat(value) || 0;
+  var clamped = Math.max(0, Math.min(24, hours));
+
+  await _supabase.from('work_logs').update({ hours: clamped, updated_at: new Date().toISOString() }).eq('date', dateStr);
+
+  for (var i = 0; i < _allLogs.length; i++) {
+    if (_allLogs[i].date === dateStr) { _allLogs[i].hours = clamped; break; }
+  }
+
+  renderDayList();
+  renderSummary();
+}
+
+// ============ 导出导入 ============
+async function exportData() {
+  var result = await _supabase.from('work_logs').select('*').order('date', { ascending: true });
+  if (result.error) { showToast('⚠️ 导出失败'); return; }
+  var configs = await _supabase.from('config').select('*').neq('key', 'app_password');
+
+  var backup = {
+    exported_at: new Date().toISOString(),
+    hourly_rate: _hourlyRate,
+    logs: result.data || [],
+    configs: configs.data || []
+  };
+
+  var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'salary-backup-' + fmtMonth(_currentYear, _currentMonth) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('✅ 导出成功~');
+}
+
+async function importData() {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    try {
+      var text = await file.text();
+      var backup = JSON.parse(text);
+      if (!backup.logs || !Array.isArray(backup.logs)) { showToast('⚠️ 文件格式不对哦'); return; }
+
+      var toUpsert = backup.logs.map(function(l) {
+        return { date: l.date, month: l.month, hours: l.hours, is_rest_day: l.is_rest_day, updated_at: new Date().toISOString() };
+      });
+
+      var result = await _supabase.from('work_logs').upsert(toUpsert, { onConflict: 'date' });
+      if (result.error) { showToast('⚠️ 导入失败：' + result.error.message); return; }
+      if (backup.hourly_rate) await saveHourlyRate(backup.hourly_rate);
+
+      showToast('✅ 已导入 ' + toUpsert.length + ' 条记录~');
+      await loadMonthData(_currentYear, _currentMonth);
+    } catch (err) {
+      showToast('⚠️ 文件解析失败');
+    }
+  };
+  input.click();
+}
+
+// ============ 启动 ============
+function startApp() {
+  initSupabase();
+
+  document.getElementById('loginBtn').addEventListener('click', doLogin);
+  document.getElementById('passwordInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+
+  checkAuth().then(function() {
+    switchPage(_isLoggedIn ? 'mainPage' : 'loginPage');
+    if (_isLoggedIn) {
+      loadSettings().then(function() { goToToday(); });
+    }
+  }).catch(function(e) {
+    console.error('Start error:', e);
+    switchPage('loginPage');
+  });
+}
+
+// 等 Supabase SDK 就绪
+function waitForSDK(cb) {
+  if (typeof supabase !== 'undefined' && supabase.createClient) {
+    cb();
+    return;
+  }
+  var n = 0;
+  var t = setInterval(function() {
+    n++;
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+      clearInterval(t);
+      cb();
+    } else if (n >= 100) {
+      clearInterval(t);
+      document.getElementById('loadingText').textContent = '网络加载失败，请刷新重试 😢';
+      document.querySelector('#loadingPage .spinner').style.display = 'none';
+    }
+  }, 100);
+}
+
+waitForSDK(startApp);
+</script>
+</body>
+</html>
